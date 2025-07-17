@@ -1,49 +1,33 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
 
 app = Flask(__name__)
-CORS(app)  # Allow requests from Flutter
+CORS(app)  # Enable CORS
 
-# Endpoint to get all available currencies
-@app.route('/currencies', methods=['GET'])
-def get_currency_list():
-    try:
-        response = requests.get("https://api.frankfurter.app/currencies")
-        data = response.json()
-        return jsonify(sorted(data.keys()))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+API_KEY = "mysecretkey"  # You can load from env instead
 
-# Endpoint to convert currency
+@app.before_request
+def check_api_key():
+    if request.endpoint == 'index':
+        return  # Allow root access
+    key = request.headers.get("x-api-key")
+    if key != API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+
+@app.route('/')
+def index():
+    return "Currency Converter API is running!"
+
 @app.route('/convert', methods=['POST'])
-def convert_currency():
-    try:
-        data = request.get_json()
-        from_curr = data['from']
-        to_curr = data['to']
-        amount = float(data['amount'])
+def convert():
+    data = request.get_json()
+    from_currency = data.get('from')
+    to_currency = data.get('to')
+    amount = float(data.get('amount', 0))
 
-        rates_resp = requests.get("https://api.frankfurter.app/latest")
-        rates = rates_resp.json()['rates']
-        rates['EUR'] = 1.0  # base
+    # Dummy conversion
+    result = amount * 82.5  # Replace with real API
+    return jsonify({"converted_amount": result})
 
-        if from_curr not in rates or to_curr not in rates:
-            return jsonify({"error": "Currency not supported!"}), 400
-
-        eur_amount = amount / rates[from_curr]
-        result = eur_amount * rates[to_curr]
-
-        return jsonify({
-            "from": from_curr,
-            "to": to_curr,
-            "amount": amount,
-            "converted": round(result, 2)
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Run the server
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=8000)
